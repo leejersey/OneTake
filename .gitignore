@@ -23,7 +23,7 @@ models/
 ~/.cache/huggingface/
 
 # 存储目录（包含上传的视频、数据库等）
-storage/
+storage/*
 !storage/.gitkeep
 
 # 数据库文件
