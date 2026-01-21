@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# 环境变量（重要！包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 模型缓存
+.cache/
+models/
+~/.cache/huggingface/
+
+# 存储目录（包含上传的视频、数据库等）
+storage/
+!storage/.gitkeep
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# 输出文件
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+output/
+results/
+
+# 测试音频/视频
+test_audio.mp3
+test_*.mp3
+test_*.wav
+test_*.mp4
+*.mp4
+*.mov
+*.avi
+*.mkv
+!frontend/public/*.mp4
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+.pytest_cache/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+

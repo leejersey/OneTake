@@ -1,0 +1,36 @@
+# FastAPI 后端服务依赖
+
+# 阶段 1 依赖（保留）
+faster-whisper>=1.0.0
+torch>=2.0.0
+torchaudio>=2.0.0
+numpy>=1.24.0
+pydub>=0.25.0
+
+# 阶段 2 新增依赖
+# Web 框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6  # 文件上传支持
+
+# 数据验证和配置
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# 异步 I/O
+aiofiles>=23.0.0
+
+# 其他工具
+python-dotenv>=1.0.0
+
+# 测试依赖
+pytest>=7.0.0
+httpx>=0.24.0
+
+# 数据库依赖
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+aiosqlite>=0.19.0
+
+# API 限流
+slowapi>=0.1.9

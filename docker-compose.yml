@@ -1,0 +1,32 @@
+# One Take - Docker Compose 配置
+# 一键启动所有服务
+
+services:
+  # 后端 API 服务
+  api:
+    build: .
+    container_name: onetake-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+    environment:
+      - DEBUG=false
+      - WHISPER_MODEL=base
+      - WHISPER_DEVICE=cpu
+      - DATABASE_URL=sqlite+aiosqlite:///./storage/onetake.db
+    restart: unless-stopped
+
+  # 前端服务
+  frontend:
+    build: ./frontend
+    container_name: onetake-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+# 数据持久化
+volumes:
+  storage:
