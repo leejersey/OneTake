@@ -185,13 +185,13 @@ class FasterWhisperASR:
                 for word in segment.words:
                     words.append(Word(
                         word=word.word.strip(),
-                        start=word.start,
-                        end=word.end,
-                        confidence=word.probability
+                        start=float(word.start),
+                        end=float(word.end),
+                        confidence=float(word.probability)
                     ))
         
         print(f"✅ 转写完成，共 {len(words)} 个词")
-        return words, info.duration
+        return words, float(info.duration)
 
 
 class SilenceDetector:
@@ -226,7 +226,7 @@ class SilenceDetector:
             
             if gap > self.threshold:
                 # 判断是否应该自动删除（超过 0.8s 的停顿建议删除）
-                auto_delete = gap > 0.8
+                auto_delete = bool(gap > 0.8)
                 
                 silences.append(SilenceSegment(
                     start=words[i].end,

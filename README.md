@@ -198,10 +198,10 @@ cd agentPy
 cp .env.example .env
 
 # 3. 一键启动
-docker-compose up -d
+docker compose up -d
 
 # 4. 查看日志
-docker-compose logs -f
+docker compose logs -f
 ```
 
 访问 http://localhost:3000 即可使用！
@@ -1050,6 +1050,10 @@ SOFTWARE.
 <div align="center">
 
 **如有问题或建议，欢迎提交 [Issue](https://github.com/yourusername/agentPy/issues) 或 [PR](https://github.com/yourusername/agentPy/pulls)！**
+
+## 交流
+可加作者微信 jersey508 备注：onetake
+也可以关注公众号（零号Ai开发者）关注项目的进度
 
 ⭐ 如果这个项目对你有帮助，请给个 Star！
 
