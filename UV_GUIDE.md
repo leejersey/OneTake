@@ -18,7 +18,7 @@ uv sync --locked
 uv run --locked python --version
 ```
 
-uv 优先使用已有 Python 3.10，没有时会自动下载。FFmpeg 是系统依赖，不由 uv 安装。AVI 硬字幕要求 FFmpeg 带 libass/subtitles 滤镜，可用 `$FFMPEG_PATH -filters` 检查；仅安装 libass 库不会给已有 FFmpeg 二进制增加滤镜。
+uv 优先使用已有 Python 3.10，没有时会自动下载。FFmpeg 是系统依赖，不由 uv 安装。带字幕导出要求 FFmpeg 带 libass/subtitles 滤镜，可用 `$FFMPEG_PATH -filters` 检查；仅安装 libass 库不会给已有 FFmpeg 二进制增加滤镜。
 
 ## 常用命令
 
@@ -56,7 +56,8 @@ uv tree
 - 单实例启动时把未完成的转写和导出标为失败，不自动继续执行。首页失败转写任务可重试（使用当前模型配置）；失败导出可从编辑器重新导出。
 - 清理只删除未被数据库引用、且不属于活动导出的过期文件；引用文件暂时持续保留，需留意磁盘容量。清理不递归删除目录。
 - 不要同时运行多个后端实例/worker：当前启动恢复没有分布式任务租约。
-- AVI 使用无延迟的 PCM 音轨（文件通常较大），字幕烧录进画面；MP4/MOV 使用软字幕；目前样式字段仍预留，字幕开关生效。
+- AVI 使用无延迟的 PCM 音轨（文件通常较大）。启用字幕时 MP4/MOV/AVI 都使用硬字幕，应用字体、颜色、描边和位置；导出后不可关闭字幕。
+- 所有带字幕导出都需要 FFmpeg 的 libass/subtitles 滤镜及所选字体，字体缺失会回退，浏览器与 FFmpeg 不保证逐像素一致。
 
 ## 修改依赖
 

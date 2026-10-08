@@ -1,7 +1,7 @@
 /**
  * 主题切换按钮组件
  */
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/theme';
 
 function ThemeToggle() {
   const { isDark, toggleTheme } = useTheme();

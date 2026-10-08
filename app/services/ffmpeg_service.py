@@ -235,21 +235,16 @@ class FFmpegService:
         subtitle_config: Dict = None,
         quality: str = 'medium'
     ) -> str:
-        """AVI burns captions with libass; MP4/MOV retain soft subtitles.
-
-        subtitle_config remains reserved for styling, as in the soft-subtitle path.
-        """
+        """Burn styled ASS (or legacy SRT) captions with libass into any format."""
         executable = shutil.which(self.ffmpeg_path) or str(Path(self.ffmpeg_path).resolve())
         with TemporaryDirectory(prefix='onetake-subtitles-') as temporary:
             cmd = [executable, '-i', str(Path(input_video).resolve())]
-            if output_path.suffix.lower() == '.avi':
-                # A fixed filename avoids filter parsing problems with punctuation in paths.
-                shutil.copyfile(subtitle_file, Path(temporary) / 'captions.srt')
-                cmd += ['-vf', 'subtitles=captions.srt', *self._get_codec_args(quality, '.avi')]
-            else:
-                cmd += ['-i', str(Path(subtitle_file).resolve()), '-map', '0:v:0',
-                        '-map', '0:a:0?', '-map', '1:0', '-c:v', 'copy', '-c:a', 'copy',
-                        '-c:s', 'mov_text', '-metadata:s:s:0', 'language=chi']
+            # Fixed names keep user paths out of FFmpeg's filter expression parser.
+            caption_name = 'captions.ass' if Path(subtitle_file).suffix.lower() == '.ass' else 'captions.srt'
+            shutil.copyfile(subtitle_file, Path(temporary) / caption_name)
+            codecs = self._get_codec_args(quality, output_path.suffix.lower())
+            cmd += ['-vf', f'subtitles={caption_name}', '-map', '0:v:0', '-map', '0:a:0?',
+                    *codecs[:codecs.index('-c:a')], '-c:a', 'copy']
             cmd += ['-y', str(output_path.resolve())]
             logger.info(f"字幕嵌入命令: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=temporary)

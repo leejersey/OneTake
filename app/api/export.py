@@ -22,15 +22,11 @@ def render_export(export_id: str, input_video: str, edl: dict, request: ExportRe
     clipped = service.clip_video(input_video, edl, output_path, request.quality.value)
     if not request.subtitle or not request.subtitle.enabled:
         return clipped
-    params = SubtitleService.get_optimal_subtitle_params(input_video)
-    srt = output_path.with_suffix('.srt')
-    SubtitleService.generate_srt(
-        words=SubtitleService.remap_words(edl.get('words', []), service.extract_keep_segments(edl)),
-        output_path=str(srt), max_chars_per_line=params['max_chars_per_line'],
-    )
+    width, height, *_ = SubtitleService.detect_aspect_ratio(clipped)
+    srt = output_path.with_suffix('.ass')
     config = request.subtitle.model_dump()
-    config['font_size'] = request.subtitle.font_size or params['font_size']
-    config['margin_v'] = params['margin_v']
+    SubtitleService.generate_ass(edl.get('words', []), str(srt), service.extract_keep_segments(edl),
+                                 config, width, height)
     final = output_path.with_name(f'{export_id}_final.{request.format.value}')
     result = service.burn_subtitles(clipped, str(srt), final, subtitle_config=config,
                                    quality=request.quality.value)

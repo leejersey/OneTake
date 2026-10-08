@@ -1,11 +1,10 @@
 /**
  * 主题上下文 - 支持亮色/暗色模式切换
  */
-import { createContext, useContext, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { ThemeContext } from './theme';
 
-const ThemeContext = createContext();
-
-export const themes = {
+const themes = {
   light: {
     name: 'light',
     background: '#ffffff',
@@ -77,13 +76,3 @@ export function ThemeProvider({ children }) {
     </ThemeContext.Provider>
   );
 }
-
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
-  }
-  return context;
-}
-
-export default ThemeContext;

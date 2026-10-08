@@ -60,6 +60,57 @@ class SubtitleService:
         return lines
     
     @staticmethod
+    def group_sentences(words: List[Dict]) -> List[List[Dict]]:
+        """Same punctuation/gap/length boundaries as the editor preview."""
+        groups, current = [], []
+        for i, word in enumerate(words):
+            current.append(word)
+            following = words[i + 1] if i + 1 < len(words) else None
+            if (word.get('word', '').endswith(('。', '！', '？', '.', '!', '?', '，', ','))
+                    or following is None or following['start'] - word['end'] > 0.45
+                    or len(current) >= 18):
+                groups.append(current)
+                current = []
+        return groups
+
+    @staticmethod
+    def generate_ass(words, output_path, segments, config, width, height):
+        """Styled captions on a logical 216px-high canvas, scaled by libass."""
+        from app.models import SubtitleConfig
+        style = SubtitleConfig(**config)
+        alignment = {'top': 8, 'center': 5, 'bottom': 2}[style.position]
+        margin = 16 if style.position == 'top' else 20
+
+        def color(value):
+            return '&H00' + value[5:7] + value[3:5] + value[1:3]
+
+        def timestamp(seconds):
+            ticks = round(seconds * 100)
+            return f'{ticks // 360000}:{ticks // 6000 % 60:02}:{ticks // 100 % 60:02}.{ticks % 100:02}'
+
+        events = []
+        for group in SubtitleService.group_sentences(words):
+            active = [word for word in group if not (word.get('auto_delete') or word.get('user_delete'))]
+            if active:
+                events.append({'word': ''.join(word['word'] for word in active),
+                               'start': active[0]['start'], 'end': active[-1]['end']})
+        primary, outline = color(style.color), color(style.outline_color)
+        lines = [
+            '[Script Info]', 'ScriptType: v4.00+', f'PlayResX: {round(216 * width / height)}',
+            'PlayResY: 216', 'WrapStyle: 1', 'ScaledBorderAndShadow: yes', '',
+            '[V4+ Styles]',
+            'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+            f'Style: Default,{style.font_name},{style.font_size or 20},{primary},{primary},{outline},&H00000000,-1,0,0,0,100,100,0,0,1,{style.outline_width},0,{alignment},12,12,{margin},1', '',
+            '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+        ]
+        for event in SubtitleService.remap_words(events, segments):
+            # Prevent transcript text from being interpreted as ASS override tags.
+            text = event['word'].replace('\\', '＼').replace('{', '｛').replace('}', '｝').replace('\n', r'\N').replace('\r', '')
+            lines.append(f"Dialogue: 0,{timestamp(event['start'])},{timestamp(event['end'])},Default,,0,0,0,,{text}")
+        Path(output_path).write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        return output_path
+
+    @staticmethod
     def remap_words(words: List[Dict], segments: List[tuple]) -> List[Dict]:
         """将原视频词时间映射到保留片段拼接后的时间轴，不修改 EDL。"""
         mapped = []
@@ -183,24 +234,17 @@ class SubtitleService:
             (width, height, aspect_ratio, orientation)
             orientation: 'horizontal' 或 'vertical'
         """
-        try:
-            import ffmpeg
-            probe = ffmpeg.probe(video_path)
-            video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
-            
-            if not video_stream:
-                return (1920, 1080, 16/9, 'horizontal')
-            
-            width = int(video_stream['width'])
-            height = int(video_stream['height'])
-            aspect_ratio = width / height
-            
-            orientation = 'horizontal' if aspect_ratio > 1 else 'vertical'
-            
-            return (width, height, aspect_ratio, orientation)
-        except Exception as e:
-            # 默认横屏
-            return (1920, 1080, 16/9, 'horizontal')
+        import json
+        import subprocess
+        from app.config import settings
+        probe = subprocess.run([
+            str(Path(settings.ffmpeg_path).with_name('ffprobe')), '-v', 'error',
+            '-show_streams', '-of', 'json', video_path,
+        ], capture_output=True, text=True, check=True, timeout=30)
+        stream = next(s for s in json.loads(probe.stdout)['streams'] if s['codec_type'] == 'video')
+        width, height = int(stream['width']), int(stream['height'])
+        aspect_ratio = width / height
+        return width, height, aspect_ratio, 'horizontal' if aspect_ratio > 1 else 'vertical'
     
     @staticmethod
     def get_optimal_subtitle_params(video_path: str) -> Dict:

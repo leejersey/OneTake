@@ -4,7 +4,7 @@ One Take API - 数据模型定义
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
@@ -66,12 +66,12 @@ class ExportQuality(str, Enum):
 class SubtitleConfig(BaseModel):
     """字幕配置"""
     enabled: bool = True
-    font_name: str = "Arial"
-    font_size: Optional[int] = None  # None 表示自动
-    color: str = "#FFFFFF"
-    outline_color: str = "#000000"
-    outline_width: int = 2
-    position: str = "bottom"  # top, center, bottom
+    font_name: str = Field(default="Arial", min_length=1, max_length=128, pattern=r'^[^,\r\n\\{}]+$')
+    font_size: Optional[int] = Field(default=None, ge=8, le=160)
+    color: str = Field(default="#FFFFFF", pattern=r'^#[0-9a-fA-F]{6}$')
+    outline_color: str = Field(default="#000000", pattern=r'^#[0-9a-fA-F]{6}$')
+    outline_width: int = Field(default=2, ge=0, le=8)
+    position: Literal['top', 'center', 'bottom'] = 'bottom'
 
 
 class EDLWord(BaseModel):

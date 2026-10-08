@@ -7,11 +7,12 @@ const editor = readFileSync(new URL('../src/pages/Editor.jsx', import.meta.url),
 
 // Run the existing handlers without introducing a JSX test framework.
 function runHandler(name, words, argument) {
-  const handler = editor.match(new RegExp(`const ${name} = \\([^)]*\\) => \\{[\\s\\S]*?\\n  \\};`))[0];
+  const handler = editor.match(new RegExp(`const ${name} = (?:useCallback\\()?\\([^)]*\\) => \\{[\\s\\S]*?\\n  \\}(?:, \\[[^\\]]*\\]\\))?;`))[0];
   let result;
   let saved;
   const context = {
     modifiedWords: words,
+    useCallback: fn => fn,
     setModifiedWords: value => { result = value; },
     saveToHistory: value => { saved = value; },
     argument,
@@ -144,7 +145,7 @@ test('export stops when saving fails and uses the saved EDL when successful', as
     const calls = [];
     const saved = { words: [{ word: 'saved' }] };
     const context = {
-      edl: {}, modifiedWords: [], taskId: 'task', subtitleEnabled: false,
+      edl: {}, modifiedWords: [], taskId: 'task', subtitleEnabled: false, isVideoFile: true,
       exportQuality: 'low', setExporting: value => calls.push(value),
       handleSave: async () => { calls.push('save'); return succeeds ? saved : null; },
       api: {
