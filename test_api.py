@@ -13,6 +13,8 @@ import time
 import sys
 from pathlib import Path
 
+# Manual end-to-end runner; requires a live server and an audio file.
+__test__ = False
 API_BASE = "http://localhost:8000"
 
 
@@ -29,7 +31,7 @@ def test_health():
             return False
     except Exception as e:
         print(f"   ❌ 无法连接到 API 服务: {e}")
-        print(f"   💡 请先启动服务: python run.py")
+        print(f"   💡 请先启动服务: uv run --locked python run.py")
         return False
 
 
@@ -89,7 +91,7 @@ def test_task_status(task_id):
                         print(f"      - 总词数: {stats.get('total_words', 0)}")
                         print(f"      - 语气词: {stats.get('filler_count', 0)}")
                         print(f"      - 静音段: {stats.get('silence_count', 0)}")
-                       print(f"      - 原始时长: {stats.get('original_duration', 0):.2f}s")
+                        print(f"      - 原始时长: {stats.get('original_duration', 0):.2f}s")
                         print(f"      - 预估时长: {stats.get('estimated_final_duration', 0):.2f}s")
                     return True
                 elif status == 'failed':

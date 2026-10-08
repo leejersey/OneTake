@@ -2,17 +2,6 @@
 API 端点集成测试
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from app.main import app
-
-
-@pytest.fixture
-def client():
-    """创建测试客户端"""
-    return TestClient(app)
-
-
 class TestHealthEndpoint:
     """健康检查端点测试"""
     
@@ -79,22 +68,15 @@ class TestRateLimiting:
     
     def test_upload_rate_limit(self, client):
         """上传端点限流"""
-        # 注意：这个测试可能需要模拟多次请求来触发限流
-        # 这里仅作示例，实际测试需要根据限流配置调整
-        import io
-        test_file = ("test.mp3", io.BytesIO(b"fake audio"), "audio/mpeg")
-        
-        # 尝试多次上传（这里简化测试，可能需要调整）
-        responses = []
-        for _ in range(2):  # 少于限流阈值的请求
-            response = client.post(
+        # Invalid extensions exercise the limit without loading ASR models.
+        statuses = [
+            client.post(
                 "/api/v1/upload",
-                files={"file": test_file}
-            )
-            responses.append(response)
-        
-        # 至少前几次请求应该成功或返回正常错误（非429）
-        assert any(r.status_code != 429 for r in responses)
+                files={"file": ("test.txt", b"test content", "text/plain")}
+            ).status_code
+            for _ in range(11)
+        ]
+        assert statuses == [400] * 10 + [429]
 
 
 class TestEdgeCases:
@@ -111,5 +93,8 @@ class TestEdgeCases:
             "/api/v1/upload",
             files={"file": ("empty.mp3", b"", "audio/mpeg")}
         )
-        # 应该返回错误或被处理
-        assert response.status_code in [400, 500]
+        assert response.status_code == 400
+        assert "为空" in response.json()["detail"]
+        assert client.get("/api/v1/tasks").json() == []
+        from app.config import settings
+        assert not list((settings.storage_path / "uploads").iterdir())

@@ -4,11 +4,11 @@ One Take API - 任务清理服务
 """
 
 import asyncio
-import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from app.config import settings
+from app.utils.task_manager import task_manager
 from app.utils.logger import get_logger
 
 logger = get_logger("cleanup")
@@ -69,29 +69,20 @@ class CleanupService:
     
     async def cleanup_once(self):
         """执行一次清理"""
-        now = datetime.now()
-        cutoff = now - self.max_age
-        
-        cleaned_uploads = await self._cleanup_directory(
-            self.storage_path / "uploads",
-            cutoff
-        )
-        
-        cleaned_exports = await self._cleanup_directory(
-            self.storage_path / "exports",
-            cutoff
-        )
-        
-        cleaned_results = await self._cleanup_directory(
-            self.storage_path / "results",
-            cutoff
-        )
-        
-        total = cleaned_uploads + cleaned_exports + cleaned_results
+        cutoff = datetime.now() - self.max_age
+        # If the database cannot be read, fail before deleting any files.
+        protected, active_exports = await task_manager.get_protected_files()
+        total = 0
+        for directory in ('uploads', 'exports', 'results'):
+            total += await asyncio.to_thread(
+                self._cleanup_directory, self.storage_path / directory,
+                cutoff, protected, active_exports
+            )
         if total > 0:
             logger.info(f"清理完成: 删除 {total} 个过期文件")
     
-    async def _cleanup_directory(self, dir_path: Path, cutoff: datetime) -> int:
+    def _cleanup_directory(self, dir_path: Path, cutoff: datetime,
+                           protected: set[Path], active_exports: set[str]) -> int:
         """
         清理指定目录中的过期文件
         
@@ -108,12 +99,15 @@ class CleanupService:
         count = 0
         for item in dir_path.iterdir():
             try:
+                # ponytail: flat storage only; add reference-aware traversal before cleaning subdirectories.
+                if not item.is_file() or item.resolve() in protected:
+                    continue
+                if any(item.name.startswith(export_id + '.') or item.name.startswith(export_id + '_')
+                       for export_id in active_exports):
+                    continue
                 mtime = datetime.fromtimestamp(item.stat().st_mtime)
                 if mtime < cutoff:
-                    if item.is_file():
-                        item.unlink()
-                    elif item.is_dir():
-                        shutil.rmtree(item)
+                    item.unlink()
                     count += 1
                     logger.debug(f"已删除过期文件: {item.name}")
             except Exception as e:

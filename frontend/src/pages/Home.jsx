@@ -8,6 +8,7 @@ function Home() {
   const [progress, setProgress] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const [historyTasks, setHistoryTasks] = useState([]);
+  const [retryingTask, setRetryingTask] = useState(null);
   const [modelSize, setModelSize] = useState('medium'); // 新增：模型选择
   const navigate = useNavigate();
 
@@ -21,6 +22,22 @@ function Home() {
       setHistoryTasks(response.data || []);
     } catch (error) {
       console.error('加载历史任务失败:', error);
+    }
+  };
+
+  const handleRetry = async (taskId) => {
+    setRetryingTask(taskId);
+    try {
+      await api.retryTask(taskId);
+      await loadHistoryTasks();
+      setUploading(true);
+      setProgressPercent(0);
+      setProgress('重新处理中...');
+      pollTaskFallback(taskId);
+    } catch (error) {
+      alert(`重试失败: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setRetryingTask(null);
     }
   };
 
@@ -280,6 +297,13 @@ function Home() {
                   <span style={styles.historyName}>
                     {task.file_path?.split('/').pop() || '未命名'}
                   </span>
+                  {task.status === 'failed' && (
+                    <button disabled={uploading || retryingTask !== null}
+                      title="使用当前后端模型配置重新转写"
+                      onClick={(event) => { event.stopPropagation(); handleRetry(task.task_id); }}>
+                      {retryingTask === task.task_id ? '提交中...' : '重试'}
+                    </button>
+                  )}
                   <span style={styles.historyDate}>
                     {new Date(task.created_at).toLocaleDateString()}
                   </span>

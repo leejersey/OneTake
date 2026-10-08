@@ -399,6 +399,7 @@ wsl
 - **双击词汇** - 编辑文字内容
 - **点击播放器** - 播放视频，文字同步高亮
 - **使用快捷键** - Ctrl+Z 撤销，Ctrl+Shift+Z 重做
+- **保存修改** - 点击“保存”，查看已保存/未保存状态；刷新读取已保存版本，导出前自动保存
 
 ### 4. 配置字幕（可选）
 
@@ -418,6 +419,10 @@ wsl
    - **快速导出** - 较小文件
 3. 等待导出完成
 4. 点击「下载」保存文件
+
+API 支持 MP4/MOV/AVI；AVI 使用 PCM 音轨和硬字幕（需要 libass），MP4/MOV 使用软字幕。样式字段目前仍预留，仅字幕开关生效。
+
+新导出状态会持久化；重启后的中断任务标记为失败，首页可重试转写，编辑器可重新导出。清理不会删除数据库引用的媒体，磁盘占用可能持续增长；启动恢复目前仅支持单后端实例。详见 [UV_GUIDE.md](UV_GUIDE.md)。
 
 ---
 
@@ -805,8 +810,8 @@ cd frontend && npm run dev
 ### 运行测试
 
 ```bash
-# 后端测试（已知 fixture/空文件问题见 UV_GUIDE.md）
-uv run --locked pytest tests/ -v
+# 后端测试（自动使用隔离的临时数据库和存储）
+uv run --locked pytest -v
 
 # 单个测试文件
 uv run --locked pytest tests/test_ffmpeg_service.py -v

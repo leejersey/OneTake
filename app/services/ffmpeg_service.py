@@ -6,6 +6,8 @@ import subprocess
 import json
 import logging
 import math
+import shutil
+from tempfile import TemporaryDirectory
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -162,7 +164,7 @@ class FFmpegService:
                '-filter_complex', ';'.join(filters), '-map', '[vout]']
         if has_audio:
             cmd += ['-map', '[aout]']
-        cmd += [*self._get_codec_args(quality), '-y', str(output_path)]
+        cmd += [*self._get_codec_args(quality, output_path.suffix), '-y', str(output_path)]
         logger.info(f"执行FFmpeg命令: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
@@ -171,40 +173,16 @@ class FFmpegService:
         logger.info(f"视频剪辑成功: {output_path}")
         return str(output_path)
     
-    def _get_codec_args(self, quality: str) -> List[str]:
-        """
-        获取编码参数
-        
-        Args:
-            quality: 质量设定
-        
-        Returns:
-            FFmpeg 参数列表
-        """
-        if quality == "high":
-            return [
-                '-c:v', 'libx264',
-                '-preset', 'slow',
-                '-crf', '18',
-                '-c:a', 'aac',
-                '-b:a', '192k'
-            ]
-        elif quality == "medium":
-            return [
-                '-c:v', 'libx264',
-                '-preset', 'medium',
-                '-crf', '23',
-                '-c:a', 'aac',
-                '-b:a', '128k'
-            ]
-        else:  # low
-            return [
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-crf', '28',
-                '-c:a', 'aac',
-                '-b:a', '96k'
-            ]
+    def _get_codec_args(self, quality: str, suffix: str = '.mp4') -> List[str]:
+        preset, crf, bitrate = {
+            'high': ('slow', '18', '192k'),
+            'medium': ('medium', '23', '128k'),
+            'low': ('fast', '28', '96k'),
+        }.get(quality, ('fast', '28', '96k'))
+        args = ['-c:v', 'libx264', '-preset', preset, '-crf', crf]
+        # PCM avoids AAC priming/padding being represented as extra AVI duration.
+        return args + (['-c:a', 'pcm_s16le'] if suffix.lower() == '.avi'
+                       else ['-c:a', 'aac', '-b:a', bitrate])
     
     def clip_video_simple(
         self,
@@ -254,43 +232,27 @@ class FFmpegService:
         input_video: str,
         subtitle_file: str,
         output_path: Path,
-        subtitle_config: Dict = None
+        subtitle_config: Dict = None,
+        quality: str = 'medium'
     ) -> str:
+        """AVI burns captions with libass; MP4/MOV retain soft subtitles.
+
+        subtitle_config remains reserved for styling, as in the soft-subtitle path.
         """
-        将字幕嵌入到视频中（软字幕方式）
-        
-        由于 macOS FFmpeg 默认不支持 libass，使用软字幕嵌入
-        
-        Args:
-            input_video: 输入视频路径
-            subtitle_file: SRT 字幕文件路径
-            output_path: 输出视频路径
-            subtitle_config: 字幕配置（预留）
-        
-        Returns:
-            输出文件路径
-        """
-        # 使用软字幕嵌入（mov_text 格式，兼容性好）
-        cmd = [
-            self.ffmpeg_path,
-            '-i', input_video,
-            '-i', subtitle_file,
-            '-c:v', 'copy',
-            '-c:a', 'copy',
-            '-c:s', 'mov_text',  # MP4 兼容的字幕格式
-            '-metadata:s:s:0', 'language=chi',  # 设置字幕语言
-            '-y',
-            str(output_path)
-        ]
-        
-        logger.info(f"字幕嵌入命令: {' '.join(cmd)}")
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600
-        )
+        executable = shutil.which(self.ffmpeg_path) or str(Path(self.ffmpeg_path).resolve())
+        with TemporaryDirectory(prefix='onetake-subtitles-') as temporary:
+            cmd = [executable, '-i', str(Path(input_video).resolve())]
+            if output_path.suffix.lower() == '.avi':
+                # A fixed filename avoids filter parsing problems with punctuation in paths.
+                shutil.copyfile(subtitle_file, Path(temporary) / 'captions.srt')
+                cmd += ['-vf', 'subtitles=captions.srt', *self._get_codec_args(quality, '.avi')]
+            else:
+                cmd += ['-i', str(Path(subtitle_file).resolve()), '-map', '0:v:0',
+                        '-map', '0:a:0?', '-map', '1:0', '-c:v', 'copy', '-c:a', 'copy',
+                        '-c:s', 'mov_text', '-metadata:s:s:0', 'language=chi']
+            cmd += ['-y', str(output_path.resolve())]
+            logger.info(f"字幕嵌入命令: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=temporary)
         
         if result.returncode != 0:
             logger.error(f"字幕嵌入失败: {result.stderr}")

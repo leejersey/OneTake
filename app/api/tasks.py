@@ -3,9 +3,11 @@ One Take API - 任务管理端点
 """
 
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse
-from app.models import TaskResult
+from app.models import TaskResult, EDLSaveRequest
+from app.config import settings
+from app.utils.rate_limit import limiter
 from app.utils.task_manager import task_manager
 
 router = APIRouter()
@@ -52,6 +54,36 @@ async def get_task_edl(task_id: str):
         return await task_manager.get_edl(task_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/api/v1/tasks/{task_id}/edl", tags=["任务管理"])
+async def save_task_edl(task_id: str, request: EDLSaveRequest):
+    try:
+        return await task_manager.save_edl(task_id, [word.model_dump() for word in request.words])
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post("/api/v1/tasks/{task_id}/retry", tags=["任务管理"])
+@limiter.limit("10/minute")
+async def retry_task(task_id: str, background_tasks: BackgroundTasks, request: Request):
+    from app.api.upload import process_asr_task
+    try:
+        info = await task_manager.get_task_info(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if not Path(info['file_path']).is_file():
+        raise HTTPException(status_code=404, detail="原始文件不存在，无法重试")
+    try:
+        await task_manager.retry_task(task_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    background_tasks.add_task(process_asr_task, task_id, info['file_path'], info['language'], settings.whisper_model)
+    return {'task_id': task_id, 'status': 'pending'}
 
 
 @router.get("/api/v1/tasks/{task_id}/audio", tags=["任务管理"])

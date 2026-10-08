@@ -5,11 +5,12 @@ One Take API - 任务管理工具（PostgreSQL 版本）
 import uuid
 from datetime import datetime
 from typing import Dict, Optional
-from sqlalchemy import select
+from sqlalchemy import select, update
+from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import TaskStatus, TaskResult
 from app.database import get_session, async_session_maker
-from app.db_models import Task, TaskResult as DBTaskResult
+from app.db_models import Task, ExportTask, TaskResult as DBTaskResult
 from app.utils.logger import get_logger
 
 logger = get_logger("task_manager")
@@ -63,8 +64,7 @@ class TaskManager:
             
             # 如果有结果，保存到 task_results 表
             if result:
-                task_result = DBTaskResult(task_id=task_id, edl_json=result)
-                session.add(task_result)
+                await session.merge(DBTaskResult(task_id=task_id, edl_json=result))
             
             await session.commit()
             logger.debug(f"更新任务 {task_id}: status={status}, progress={progress}")
@@ -115,6 +115,73 @@ class TaskManager:
             
             return task_result.edl_json
     
+    async def save_edl(self, task_id: str, words: list[dict]) -> dict:
+        async with async_session_maker() as session:
+            task = await session.get(Task, task_id)
+            result = await session.get(DBTaskResult, task_id)
+            if not task or not result:
+                raise LookupError(f"任务 {task_id} 的结果不存在")
+            if task.status != TaskStatus.COMPLETED.value:
+                raise RuntimeError("只能编辑已完成的任务")
+            edl = dict(result.edl_json)
+            duration = edl.get('duration', (edl.get('statistics') or {}).get('original_duration'))
+            if duration is not None and any(w['end'] > duration for w in words):
+                raise ValueError("词时间超过媒体时长")
+            if any(a['start'] > b['start'] for a, b in zip(words, words[1:])):
+                raise ValueError("词时间必须按顺序排列")
+            edl['words'] = words
+            edl['transcript'] = ' '.join(w['word'] for w in words)
+            result.edl_json = edl
+            task.updated_at = datetime.now()
+            await session.commit()
+            return edl
+
+    async def create_export(self, task_id: str) -> str:
+        export_id = str(uuid.uuid4())
+        async with async_session_maker() as session:
+            session.add(ExportTask(id=export_id, task_id=task_id))
+            await session.commit()
+        return export_id
+
+    async def get_export(self, export_id: str) -> dict:
+        async with async_session_maker() as session:
+            item = await session.get(ExportTask, export_id)
+            if not item:
+                raise ValueError(f"导出任务 {export_id} 不存在")
+            return item.to_dict()
+
+    async def update_export(self, export_id: str, **fields):
+        async with async_session_maker() as session:
+            await session.execute(update(ExportTask).where(ExportTask.id == export_id)
+                                  .values(**fields, updated_at=datetime.now()))
+            await session.commit()
+
+    async def recover_interrupted_tasks(self):
+        # ponytail: recovery assumes one server instance; add leases before multi-instance deployment.
+        async with async_session_maker() as session:
+            for model in (Task, ExportTask):
+                await session.execute(update(model)
+                    .where(model.status.in_(['pending', 'processing']))
+                    .values(status='failed', error='服务重启，任务已中断，请重试', updated_at=datetime.now()))
+            await session.commit()
+
+    async def retry_task(self, task_id: str):
+        async with async_session_maker() as session:
+            result = await session.execute(update(Task)
+                .where(Task.id == task_id, Task.status == 'failed')
+                .values(status='pending', progress=0, error=None, updated_at=datetime.now()))
+            if result.rowcount != 1:
+                raise RuntimeError("只能重试失败的任务")
+            await session.commit()
+
+    async def get_protected_files(self) -> tuple[set[Path], set[str]]:
+        async with async_session_maker() as session:
+            files = (await session.execute(select(Task.file_path))).scalars().all()
+            exports = (await session.execute(select(ExportTask))).scalars().all()
+            files += [item.output_file for item in exports if item.output_file]
+            active = {item.id for item in exports if item.status in ('pending', 'processing')}
+            return {Path(file).resolve() for file in files}, active
+
     async def get_task_info(self, task_id: str) -> Dict:
         """获取任务的原始信息（包括文件路径）"""
         async with async_session_maker() as session:

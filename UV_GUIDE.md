@@ -6,7 +6,9 @@
 
 ```bash
 # macOS
-brew install uv ffmpeg
+brew install uv ffmpeg-full
+# 在 .env 中设置：FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg
+# Intel Mac 通常使用 /usr/local/opt/ffmpeg-full/bin/ffmpeg；以 brew --prefix ffmpeg-full 为准。
 
 # Linux：安装 uv，FFmpeg 另用系统包管理器安装
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -16,7 +18,7 @@ uv sync --locked
 uv run --locked python --version
 ```
 
-uv 优先使用已有 Python 3.10，没有时会自动下载。FFmpeg 是系统依赖，不由 uv 安装。
+uv 优先使用已有 Python 3.10，没有时会自动下载。FFmpeg 是系统依赖，不由 uv 安装。AVI 硬字幕要求 FFmpeg 带 libass/subtitles 滤镜，可用 `$FFMPEG_PATH -filters` 检查；仅安装 libass 库不会给已有 FFmpeg 二进制增加滤镜。
 
 ## 常用命令
 
@@ -37,13 +39,24 @@ uv run --locked python asr_demo.py --input your_audio.mp3 --output result.json -
 uv run --locked --with edge-tts python generate_test_audio.py --output test.mp3
 
 # 测试
-uv run --locked pytest tests/ -v
+uv run --locked pytest -v
 
 # 查看依赖
 uv tree
 ```
 
-已知测试问题仍保留：根目录 `test_api.py` 有缩进错误；API 测试未初始化数据库；空文件上传未拒绝。环境迁移不修复这些业务和测试问题。
+自动测试使用临时存储，每个 API 测试有独立数据库并运行应用启动/关闭流程，不访问真实任务数据。空文件上传返回 HTTP 400。
+
+`test_api.py` 是手动端到端脚本，不作为 pytest 用例收集；运行它需要先启动后端并提供音频文件：`uv run --locked python test_api.py test_audio.mp3`。
+
+## 编辑与长任务
+
+- 编辑后点击“保存”；导出前也会保存，失败时不会继续导出。刷新页面读取已保存 EDL。刷新、关闭页面或点击工具栏返回时提示未保存修改；浏览器的 SPA 后退暂不拦截。
+- 新导出状态与输出路径存入数据库，重启后仍可查询、下载已完成的文件；历史内存导出记录无法恢复。
+- 单实例启动时把未完成的转写和导出标为失败，不自动继续执行。首页失败转写任务可重试（使用当前模型配置）；失败导出可从编辑器重新导出。
+- 清理只删除未被数据库引用、且不属于活动导出的过期文件；引用文件暂时持续保留，需留意磁盘容量。清理不递归删除目录。
+- 不要同时运行多个后端实例/worker：当前启动恢复没有分布式任务租约。
+- AVI 使用无延迟的 PCM 音轨（文件通常较大），字幕烧录进画面；MP4/MOV 使用软字幕；目前样式字段仍预留，字幕开关生效。
 
 ## 修改依赖
 

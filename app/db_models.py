@@ -38,6 +38,25 @@ class Task(Base):
         }
 
 
+class ExportTask(Base):
+    """Persistent export state, independent of process memory."""
+    __tablename__ = "export_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_file: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    def to_dict(self):
+        return {"export_id": self.id, "task_id": self.task_id, "status": self.status,
+                "progress": self.progress, "error": self.error, "output_file": self.output_file,
+                "created_at": self.created_at, "updated_at": self.updated_at}
+
+
 class TaskResult(Base):
     """任务结果表（存储 EDL JSON）"""
     __tablename__ = "task_results"

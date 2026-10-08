@@ -55,9 +55,8 @@ async def process_asr_task(task_id: str, file_path: str, language: str = None, m
         logger.info(f"加载 Whisper 模型: {actual_model}...")
         await update_progress(progress=20)
         
-        asr_service = ASRService(
-            model_size=actual_model,
-            device=settings.whisper_device
+        asr_service = await asyncio.to_thread(
+            ASRService, model_size=actual_model, device=settings.whisper_device
         )
         
         logger.info("模型加载完成，开始转写...")
@@ -67,12 +66,7 @@ async def process_asr_task(task_id: str, file_path: str, language: str = None, m
         logger.info(f"正在转写音频文件: {file_path}")
         await update_progress(progress=40)
         
-        # 使用 run_in_executor 在线程池中运行同步的 ASR 处理
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: asr_service.process(file_path, language=language)
-        )
+        result = await asyncio.to_thread(asr_service.process, file_path, language=language)
         
         logger.info(f"转写完成，共 {len(result.get('words', []))} 个词")
         await update_progress(progress=90)
@@ -98,7 +92,7 @@ async def process_asr_task(task_id: str, file_path: str, language: str = None, m
         logger.error(f"任务 {task_id} 处理失败: {str(e)}")
         await update_progress(status=TaskStatus.FAILED, error=str(e))
 
-from app.main import limiter
+from app.utils.rate_limit import limiter
 
 @router.post("/api/v1/upload", response_model=UploadResponse, tags=["文件上传"])
 @limiter.limit("10/minute")
@@ -133,6 +127,9 @@ async def upload_file(
     file_size = len(content)
     await file.seek(0)  # 重置文件指针
     
+    if file_size == 0:
+        raise HTTPException(status_code=400, detail="上传文件不能为空")
+
     if file_size > settings.max_file_size:
         raise HTTPException(
             status_code=400,

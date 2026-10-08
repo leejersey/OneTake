@@ -5,16 +5,13 @@ One Take API - FastAPI 应用主入口
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
+from app.utils.rate_limit import limiter
 from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.api import health
 from app.exceptions import OneTakeException
 from app.utils.logger import logger
-
-# 初始化限流器
-limiter = Limiter(key_func=get_remote_address)
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -92,6 +89,8 @@ async def startup_event():
     # 初始化数据库
     await init_db()
     logger.info("🗄️  数据库已连接")
+    from app.utils.task_manager import task_manager
+    await task_manager.recover_interrupted_tasks()
     
     # 启动清理服务
     await cleanup_service.start()

@@ -10,6 +10,9 @@ function Editor() {
   const [edl, setEdl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modifiedWords, setModifiedWords] = useState([]);
+  const [savedWords, setSavedWords] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const hasUnsavedChanges = savedWords !== null && modifiedWords !== savedWords;
   const [exporting, setExporting] = useState(false);
   const [exportQuality, setExportQuality] = useState('high');
   const [currentTime, setCurrentTime] = useState(0);
@@ -36,6 +39,17 @@ function Editor() {
   useEffect(() => {
     loadEDL();
   }, [taskId]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    // ponytail: SPA back navigation needs a data-router blocker if every route change must be guarded.
+    const warnBeforeLeaving = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [hasUnsavedChanges]);
 
   // 键盘快捷键
   useEffect(() => {
@@ -103,6 +117,7 @@ function Editor() {
       setEdl(response.data);
       const words = response.data.words || [];
       setModifiedWords(words);
+      setSavedWords(words);
       setHistory([words]);
       setHistoryIndex(0);
       setLoading(false);
@@ -200,10 +215,31 @@ function Editor() {
     setCurrentTime(time);
   }, []);
 
+  const handleSave = async () => {
+    const words = modifiedWords;
+    setSaving(true);
+    try {
+      const response = await api.saveEDL(taskId, { words });
+      setEdl(response.data);
+      setSavedWords(words);
+      return response.data;
+    } catch (error) {
+      console.error('保存失败:', error);
+      alert(`保存失败: ${error.response?.data?.detail || error.message}`);
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleExport = async () => {
     try {
       setExporting(true);
-      const customEDL = { ...edl, words: modifiedWords };
+      const customEDL = await handleSave();
+      if (!customEDL) {
+        setExporting(false);
+        return;
+      }
       
       // 准备字幕配置
       const subtitleParam = subtitleEnabled ? {
@@ -222,23 +258,27 @@ function Editor() {
       
       // 轮询导出状态
       const pollExport = async () => {
-        const statusResponse = await api.getExportStatus(exportId);
-        const status = statusResponse.data;
-        
-        if (status.status === 'completed') {
-          const downloadUrl = api.getDownloadUrl(exportId);
-          window.open(downloadUrl, '_blank');
+        try {
+          const statusResponse = await api.getExportStatus(exportId);
+          const status = statusResponse.data;
+          if (status.status === 'completed') {
+            const downloadUrl = api.getDownloadUrl(exportId);
+            window.open(downloadUrl, '_blank');
+            setExporting(false);
+            alert('视频导出成功！下载已开始');
+          } else if (status.status === 'failed') {
+            alert(`导出失败: ${status.error}`);
+            setExporting(false);
+          } else {
+            setTimeout(pollExport, 3000);
+          }
+        } catch (error) {
+          alert(`查询导出状态失败: ${error.message}`);
           setExporting(false);
-          alert('视频导出成功！下载已开始');
-        } else if (status.status === 'failed') {
-          alert(`导出失败: ${status.error}`);
-          setExporting(false);
-        } else {
-          setTimeout(pollExport, 3000);
         }
       };
       
-      pollExport();
+      await pollExport();
     } catch (error) {
       console.error('导出失败:', error);
       alert(`导出失败: ${error.message}`);
@@ -267,11 +307,17 @@ function Editor() {
     <div style={styles.container}>
       {/* 顶部工具栏 */}
       <div style={styles.header}>
-        <button onClick={() => navigate('/')} style={styles.backButton}>
+        <button onClick={() => {
+          if (!hasUnsavedChanges || window.confirm('有未保存的修改，确定离开？')) navigate('/');
+        }} style={styles.backButton}>
           ← 返回首页
         </button>
         <h1 style={styles.title}>One Take 编辑器</h1>
         <div style={styles.headerActions}>
+          <span role="status">{hasUnsavedChanges ? '未保存' : '已保存'}</span>
+          <button onClick={handleSave} disabled={saving || exporting || !hasUnsavedChanges} style={styles.actionButton}>
+            {saving ? '保存中...' : '保存'}
+          </button>
           <button onClick={handleUndo} disabled={historyIndex <= 0} style={styles.actionButton} title="撤销 (Ctrl+Z)">
             ↩️ 撤销
           </button>
@@ -290,7 +336,7 @@ function Editor() {
           </select>
           <button 
             onClick={handleExport} 
-            disabled={exporting}
+            disabled={exporting || saving}
             style={{...styles.exportButton, opacity: exporting ? 0.6 : 1}}
           >
             {exporting ? '导出中...' : '📤 导出视频'}

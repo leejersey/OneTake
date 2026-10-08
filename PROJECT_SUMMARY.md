@@ -62,7 +62,7 @@ uv run --locked python run.py
 open http://localhost:8000/docs
 
 # 4. 测试 API
-uv run --locked python test_api.py test_audio.mp3  # 旧脚本有已知缩进错误，待修复
+uv run --locked python test_api.py test_audio.mp3  # 需先启动后端并准备音频
 ```
 
 ## 📁 项目结构

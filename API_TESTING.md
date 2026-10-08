@@ -104,6 +104,24 @@ curl http://localhost:8000/api/v1/tasks/{task_id}/edl
 
 **响应**: 完整的 EDL JSON（与 asr_demo.py 输出格式相同）
 
+### 5. 保存编辑后的词
+
+```bash
+curl -X PUT http://localhost:8000/api/v1/tasks/{task_id}/edl \
+  -H 'Content-Type: application/json' \
+  -d '{"words":[{"word":"修改后的文字","start":0,"end":1,"user_delete":false}]}'
+```
+
+时间必须非负、有限、按顺序排列且不超过原媒体时长；这里只更新 words，原媒体元数据不会被客户端覆盖。实际使用请发送完整词数组。
+
+### 6. 重试失败的转写任务
+
+```bash
+curl -X POST http://localhost:8000/api/v1/tasks/{task_id}/retry
+```
+
+只接受失败任务，原文件必须存在。重试使用当前后端模型配置。导出状态接口及下载地址保持不变，新导出记录重启后仍然有效。
+
 ## 使用 httpie 测试（更友好）
 
 ```bash

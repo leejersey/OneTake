@@ -38,6 +38,8 @@ export const api = {
   
   // 获取 EDL
   getEDL: (taskId) => apiClient.get(`/api/v1/tasks/${taskId}/edl`),
+  saveEDL: (taskId, data) => apiClient.put(`/api/v1/tasks/${taskId}/edl`, data),
+  retryTask: (taskId) => apiClient.post(`/api/v1/tasks/${taskId}/retry`),
   
   // 导出视频
   exportVideo: (taskId, params) => 

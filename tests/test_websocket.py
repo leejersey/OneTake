@@ -3,16 +3,6 @@ WebSocket 端点测试
 """
 
 import pytest
-from fastapi.testclient import TestClient
-from app.main import app
-
-
-@pytest.fixture
-def client():
-    """创建测试客户端"""
-    return TestClient(app)
-
-
 class TestWebSocketEndpoint:
     """WebSocket 端点测试"""
     

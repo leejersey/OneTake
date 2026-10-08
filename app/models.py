@@ -5,7 +5,7 @@ One Take API - 数据模型定义
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 class TaskStatus(str, Enum):
@@ -72,6 +72,25 @@ class SubtitleConfig(BaseModel):
     outline_color: str = "#000000"
     outline_width: int = 2
     position: str = "bottom"  # top, center, bottom
+
+
+class EDLWord(BaseModel):
+    model_config = ConfigDict(extra="allow", allow_inf_nan=False)
+    word: str
+    start: float = Field(ge=0)
+    end: float = Field(ge=0)
+    auto_delete: bool = False
+    user_delete: bool = False
+
+    @model_validator(mode="after")
+    def validate_interval(self):
+        if self.end < self.start:
+            raise ValueError("词结束时间不能早于开始时间")
+        return self
+
+
+class EDLSaveRequest(BaseModel):
+    words: list[EDLWord]
 
 
 class ExportRequest(BaseModel):
