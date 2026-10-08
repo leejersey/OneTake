@@ -52,17 +52,17 @@
 ## 🚀 快速开始
 
 ```bash
-# 1. 激活环境
-conda activate onetake
+# 1. 同步 uv 环境
+uv sync --locked
 
 # 2. 启动 API 服务
-python run.py
+uv run --locked python run.py
 
 # 3. 访问文档
 open http://localhost:8000/docs
 
 # 4. 测试 API
-python test_api.py test_audio.mp3
+uv run --locked python test_api.py test_audio.mp3  # 旧脚本有已知缩进错误，待修复
 ```
 
 ## 📁 项目结构

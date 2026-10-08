@@ -8,8 +8,8 @@
 2. **启动 API 服务**
 
 ```bash
-conda activate onetake
-python run.py
+uv sync --locked
+uv run --locked python run.py
 ```
 
 ## 测试流程

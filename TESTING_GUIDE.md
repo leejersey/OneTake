@@ -2,18 +2,20 @@
 
 ## 测试准备
 
-### 1. 确保环境已激活
+### 1. 同步 uv 环境
 
 ```bash
-conda activate onetake
+uv sync --locked
 ```
+
+无需激活 Conda，安装方法见 [uv 环境指南](UV_GUIDE.md)。
 
 ### 2. 启动后端 API 服务
 
 ```bash
 # 在终端 1
 cd /Users/lizexi/Documents/AI/agentPy
-python run.py
+uv run --locked python run.py
 ```
 
 服务将在 `http://localhost:8000` 启动。
@@ -149,7 +151,7 @@ ffmpeg -f lavfi -i color=c=blue:s=1280x720:d=40 \
 
 终端 1（后端）:
 ```bash
-conda activate onetake && cd /Users/lizexi/Documents/AI/agentPy && python run.py
+cd /Users/lizexi/Documents/AI/agentPy && uv run --locked python run.py
 ```
 
 终端 2（前端）:

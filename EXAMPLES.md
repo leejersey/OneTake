@@ -7,26 +7,26 @@
 ### 1. 最简单的使用
 
 ```bash
-python asr_demo.py --input your_audio.mp3 --output result.json
+uv run --locked python asr_demo.py --input your_audio.mp3 --output result.json
 ```
 
 ### 2. 指定中文语言
 
 ```bash
-python asr_demo.py --input audio.mp3 --language zh --output result.json
+uv run --locked python asr_demo.py --input audio.mp3 --language zh --output result.json
 ```
 
 ### 3. 使用更高质量的模型
 
 ```bash
-python asr_demo.py --input audio.mp3 --model small --output result.json --pretty
+uv run --locked python asr_demo.py --input audio.mp3 --model small --output result.json --pretty
 ```
 
 ### 4. 调整静音检测阈值
 
 ```bash
 # 只标记超过 1 秒的停顿为静音
-python asr_demo.py --input audio.mp3 --silence-threshold 1.0
+uv run --locked python asr_demo.py --input audio.mp3 --silence-threshold 1.0
 ```
 
 ## 完整工作流示例
@@ -48,17 +48,16 @@ python asr_demo.py --input audio.mp3 --silence-threshold 1.0
 
 ```bash
 # 步骤 1: 安装依赖
-pip install -r requirements.txt
+uv sync --locked
 
 # 步骤 2: 生成测试音频（需要 edge-tts）
-pip install edge-tts
-python generate_test_audio.py --output test.mp3 --language zh
+uv run --locked --with edge-tts python generate_test_audio.py --output test.mp3 --language zh
 
 # 步骤 3: 运行 ASR
-python asr_demo.py --input test.mp3 --output result.json --pretty
+uv run --locked python asr_demo.py --input test.mp3 --output result.json --pretty
 
 # 步骤 4: 查看结果
-cat result.json | python -m json.tool | head -50
+uv run --locked python -m json.tool result.json | head -50
 ```
 
 ## 预期输出示例
@@ -186,7 +185,7 @@ cat result.json | python -m json.tool | head -50
 
 **解决方案**:
 ```bash
-pip install faster-whisper
+uv sync --locked
 ```
 
 ### 问题 2: CUDA out of memory
@@ -194,10 +193,10 @@ pip install faster-whisper
 **解决方案**:
 ```bash
 # 使用更小的模型
-python asr_demo.py --input audio.mp3 --model tiny
+uv run --locked python asr_demo.py --input audio.mp3 --model tiny
 
 # 或强制使用 CPU
-python asr_demo.py --input audio.mp3 --device cpu
+uv run --locked python asr_demo.py --input audio.mp3 --device cpu
 ```
 
 ### 问题 3: 没有检测到任何语音
@@ -227,15 +226,15 @@ ffmpeg -i input.mp4 -vn -acodec libmp3lame output.mp3
 ```bash
 #!/bin/bash
 for file in *.mp3; do
-    python asr_demo.py --input "$file" --output "${file%.mp3}.json" --pretty
+    uv run --locked python asr_demo.py --input "$file" --output "${file%.mp3}.json" --pretty
 done
 ```
 
 ### 只提取转写文本
 
 ```bash
-python asr_demo.py --input audio.mp3 --output result.json
-cat result.json | python -c "import sys, json; print(json.load(sys.stdin)['transcript'])"
+uv run --locked python asr_demo.py --input audio.mp3 --output result.json
+cat result.json | uv run --locked python -c "import sys, json; print(json.load(sys.stdin)['transcript'])"
 ```
 
 ### 导出字幕文件（SRT 格式）

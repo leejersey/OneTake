@@ -4,13 +4,10 @@
 echo "🚀 One Take 完整系统启动"
 echo "======================================"
 
-# 检查 conda 环境
-if ! conda info --envs | grep -q "onetake"; then
-    echo "❌ 错误: conda 环境 'onetake' 不存在"
-    exit 1
-fi
+cd "$(dirname "$0")"
 
-echo "✅ Conda 环境检查通过"
+# 在启动服务前完成环境安装
+uv sync --locked || exit 1
 
 # 启动后端
 echo ""
@@ -19,9 +16,7 @@ echo "   访问: http://localhost:8000/docs"
 echo ""
 
 # 在后台启动后端
-source $(conda info --base)/etc/profile.d/conda.sh
-conda activate onetake
-python run.py &
+uv run --locked python run.py &
 BACKEND_PID=$!
 
 # 等待后端启动

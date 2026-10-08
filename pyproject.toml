@@ -1,0 +1,33 @@
+[project]
+name = "onetake"
+version = "0.1.0"
+description = "Speech-driven video editing API"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+    "numpy>=1.24.0",
+    "pydub>=0.25.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "aiofiles>=23.0.0",
+    "python-dotenv>=1.0.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "aiosqlite>=0.19.0",
+    "slowapi>=0.1.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "httpx>=0.24.0",
+    "requests>=2.31.0",
+]
+
+[tool.uv]
+package = false

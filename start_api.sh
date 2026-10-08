@@ -8,4 +8,4 @@ echo "📍 访问 http://localhost:8000/docs 查看 API 文档"
 echo ""
 
 # 使用 uvicorn 模块方式启动
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+exec uv run --locked uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

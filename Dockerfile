@@ -8,11 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件
-COPY requirements.txt .
-
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 与本地环境使用相同版本的 uv 和锁文件
+COPY --from=ghcr.io/astral-sh/uv:0.10.11 /uv /uvx /bin/
+COPY pyproject.toml uv.lock .python-version ./
+RUN uv sync --locked --no-dev
+ENV PATH="/app/.venv/bin:$PATH"
 
 # 复制应用代码
 COPY app/ ./app/

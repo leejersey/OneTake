@@ -211,12 +211,11 @@ docker compose logs -f
 适合开发者和自定义需求：
 
 ```bash
-# 1. 创建 conda 环境
-conda create -n onetake python=3.10
-conda activate onetake
+# 1. 安装 uv（Linux 见 UV_GUIDE.md）
+brew install uv
 
-# 2. 安装后端依赖
-pip install -r requirements.txt
+# 2. 安装锁定的后端依赖（自动创建 Python 3.10 .venv）
+uv sync --locked
 
 # 3. 安装 FFmpeg
 # macOS
@@ -226,7 +225,7 @@ brew install ffmpeg libass
 sudo apt-get install ffmpeg libass-dev
 
 # 4. 启动后端
-python run.py
+uv run --locked python run.py
 
 # 5. 启动前端（新终端）
 cd frontend
@@ -252,8 +251,8 @@ npm run dev
 ### 2. 安装依赖
 
 ```bash
-# 安装 Python（如使用系统 Python 可跳过）
-brew install python@3.10
+# uv 自动选择或下载 Python 3.10
+brew install uv
 
 # 安装 FFmpeg
 brew install ffmpeg libass
@@ -262,23 +261,13 @@ brew install ffmpeg libass
 brew install node
 ```
 
-### 3. 创建虚拟环境
+### 3. 创建环境并安装锁定的依赖
 
 ```bash
-# 使用 conda（推荐）
-conda create -n onetake python=3.10
-conda activate onetake
-
-# 或使用 venv
-python3.10 -m venv venv
-source venv/bin/activate
+uv sync --locked
 ```
 
-### 4. 安装 Python 依赖
-
-```bash
-pip install -r requirements.txt
-```
+无需激活环境；配置与依赖更新见 [uv 环境指南](UV_GUIDE.md)。
 
 ### 5. 配置环境变量
 
@@ -290,14 +279,14 @@ cp .env.example .env
 ### 6. 初始化数据库
 
 ```bash
-python -c "from app.database import init_db; import asyncio; asyncio.run(init_db())"
+uv run --locked python -c "from app.database import init_db; import asyncio; asyncio.run(init_db())"
 ```
 
 ### 7. 启动服务
 
 ```bash
 # 后端
-python run.py
+uv run --locked python run.py
 
 # 前端（新终端）
 cd frontend && npm install && npm run dev
@@ -318,8 +307,8 @@ sudo apt-get upgrade -y
 ### 2. 安装系统依赖
 
 ```bash
-# Python 和构建工具
-sudo apt-get install -y python3.10 python3.10-venv python3-pip
+# 安装 uv（缺少 Python 3.10 时由 uv 自动下载）
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # FFmpeg 和字幕支持
 sudo apt-get install -y ffmpeg libass-dev
@@ -329,17 +318,10 @@ curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 ```
 
-### 3. 创建虚拟环境
+### 3. 创建环境并安装锁定的依赖
 
 ```bash
-python3.10 -m venv venv
-source venv/bin/activate
-```
-
-### 4. 安装 Python 依赖
-
-```bash
-pip install -r requirements.txt
+uv sync --locked
 ```
 
 ### 5. 配置环境变量
@@ -353,7 +335,7 @@ nano .env  # 编辑配置
 
 ```bash
 # 后端
-python run.py &
+uv run --locked python run.py &
 
 # 前端
 cd frontend && npm install && npm run dev
@@ -493,7 +475,9 @@ agentPy/
 ├── .gitignore                    # Git 忽略文件
 ├── Dockerfile                    # 后端容器
 ├── docker-compose.yml            # Docker Compose 配置
-├── requirements.txt              # Python 依赖
+├── pyproject.toml                # Python 依赖声明
+├── uv.lock                       # 可复现的依赖锁文件
+├── requirements.txt              # 从 uv.lock 导出的兼容文件
 ├── run.py                        # 后端启动脚本
 ├── start_all.sh                  # 一键启动脚本
 └── README.md                     # 本文档
@@ -719,14 +703,14 @@ lsof -ti:8000 | xargs kill -9
 
 **配置**：
 ```bash
-# 安装 GPU 版本 PyTorch
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# 使用锁定的依赖；自定义 CUDA 索引请先阅读 UV_GUIDE.md
+uv sync --locked
 
 # 修改 .env
 WHISPER_DEVICE=cuda
 
 # 验证
-python -c "import torch; print(torch.cuda.is_available())"
+uv run --locked python -c "import torch; print(torch.cuda.is_available())"
 ```
 
 </details>
@@ -755,7 +739,7 @@ docker-compose down -v  # 完全重置
 
 ```bash
 # 后端日志（开发模式）
-python run.py  # 直接在终端查看
+uv run --locked python run.py  # 直接在终端查看
 
 # Docker 日志
 docker-compose logs -f api
@@ -769,10 +753,10 @@ docker logs onetake-api --tail 100 -f
 
 | 错误信息 | 可能原因 | 解决方案 |
 |----------|----------|----------|
-| `ModuleNotFoundError: No module named 'faster_whisper'` | 依赖未安装 | `pip install -r requirements.txt` |
+| `ModuleNotFoundError: No module named 'faster_whisper'` | 依赖未安装 | `uv sync --locked` |
 | `RuntimeError: CUDA out of memory` | GPU 内存不足 | 使用 CPU 或更小模型 |
 | `FileNotFoundError: [Errno 2] No such file or directory: 'ffmpeg'` | FFmpeg 未安装 | 安装 FFmpeg |
-| `Connection refused` | 后端未启动 | 启动 `python run.py` |
+| `Connection refused` | 后端未启动 | 启动 `uv run --locked python run.py` |
 | `CORS error` | 跨域配置问题 | 检查 `app/main.py` CORS 设置 |
 
 ### 性能优化建议
@@ -808,13 +792,11 @@ docker logs onetake-api --tail 100 -f
 git clone https://github.com/yourusername/agentPy.git
 cd agentPy
 
-# 2. 创建开发环境
-conda create -n onetake-dev python=3.10
-conda activate onetake-dev
-pip install -r requirements.txt
+# 2. 创建开发环境（包含测试依赖）
+uv sync --locked
 
 # 3. 启动后端（热重载）
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run --locked uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # 4. 启动前端（热重载）
 cd frontend && npm run dev
@@ -823,22 +805,22 @@ cd frontend && npm run dev
 ### 运行测试
 
 ```bash
-# 后端测试
-pytest tests/ -v
+# 后端测试（已知 fixture/空文件问题见 UV_GUIDE.md）
+uv run --locked pytest tests/ -v
 
 # 单个测试文件
-pytest tests/test_asr.py -v
+uv run --locked pytest tests/test_ffmpeg_service.py -v
 
-# 覆盖率测试
-pytest --cov=app tests/
+# 覆盖率测试（临时安装可选工具）
+uv run --locked --with pytest-cov pytest --cov=app tests/
 ```
 
 ### 代码规范
 
 ```bash
 # Python 代码格式化
-black app/ tests/
-flake8 app/ tests/
+uvx black app/ tests/
+uvx flake8 app/ tests/
 
 # JavaScript 代码检查
 cd frontend
@@ -884,7 +866,7 @@ npm run lint
    ```bash
    # 进行修改
    # 运行测试
-   pytest tests/
+   uv run --locked pytest tests/
    ```
 
 3. **提交代码**
@@ -995,7 +977,7 @@ chore: 构建/工具链
 ## 📚 相关文档
 
 - [API 测试指南](API_TESTING.md) - API 调用示例
-- [Conda 环境指南](CONDA_GUIDE.md) - 详细环境配置
+- [uv 环境指南](UV_GUIDE.md) - Python 环境、锁文件和依赖管理
 - [启动指南](STARTUP.md) - 快速启动脚本
 - [项目总结](PROJECT_SUMMARY.md) - 开发历程
 - [FFmpeg 测试](FFMPEG_TESTING.md) - 视频处理测试

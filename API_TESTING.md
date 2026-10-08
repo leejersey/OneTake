@@ -3,14 +3,14 @@
 ## 启动服务
 
 ```bash
-# 激活 conda 环境
-conda activate onetake
+# 同步 uv 环境
+uv sync --locked
 
-# 启动 FastAPI 服务
-python app/main.py
+# 在项目根目录启动 FastAPI 服务
+uv run --locked python run.py
 
 # 或使用 uvicorn 直接启动
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run --locked uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 服务将在 `http://localhost:8000` 启动。
@@ -107,13 +107,10 @@ curl http://localhost:8000/api/v1/tasks/{task_id}/edl
 ## 使用 httpie 测试（更友好）
 
 ```bash
-# 安装 httpie
-pip install httpie
-
-# 测试 API
-http GET localhost:8000/health
-http POST localhost:8000/api/v1/upload file@test_audio.mp3 language=zh
-http GET localhost:8000/api/v1/tasks/{task_id}
+# 使用临时工具环境，不修改项目依赖
+uvx --from httpie http GET localhost:8000/health
+uvx --from httpie http POST localhost:8000/api/v1/upload file@test_audio.mp3 language=zh
+uvx --from httpie http GET localhost:8000/api/v1/tasks/{task_id}
 ```
 
 ## Python 客户端示例
@@ -200,7 +197,7 @@ print(f"EDL 数据长度: {len(edl['words'])} 个词")
 启动开发模式（自动重载）：
 
 ```bash
-uvicorn app.main:app --reload --log-level debug
+uv run --locked uvicorn app.main:app --reload --log-level debug
 ```
 
 查看日志：
