@@ -3,11 +3,11 @@ One Take API - FFmpeg 视频剪辑服务
 """
 
 import subprocess
-import uuid
+import json
 import logging
+import math
 from pathlib import Path
 from typing import Dict, List, Tuple
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -76,30 +76,24 @@ class FFmpegService:
         if current_start is not None and current_end is not None:
             segments.append((current_start, current_end))
         
-        return segments
-    
-    def create_concat_file(self, input_video: str, segments: List[Tuple[float, float]], concat_file: Path) -> None:
-        """
-        创建 FFmpeg concat 文件
-        
-        Args:
-            input_video: 输入视频路径
-            segments: 保留片段列表
-            concat_file: concat 文件路径
-        """
-        # 使用绝对路径,避免路径解析问题
-        abs_input_video = str(Path(input_video).resolve())
-        logger.info(f"创建concat文件: {concat_file}, 输入视频: {abs_input_video}, 片段数: {len(segments)}")
-        
-        with open(concat_file, 'w') as f:
+        for silence in edl.get('silence_segments', []):
+            if not (silence.get('auto_delete') or silence.get('user_delete')):
+                continue
+            cut_start, cut_end = float(silence['start']), float(silence['end'])
+            if not (math.isfinite(cut_start) and math.isfinite(cut_end)
+                    and 0 <= cut_start < cut_end):
+                raise ValueError("无效的静音时间区间")
+            remaining = []
             for start, end in segments:
-                f.write(f"file '{abs_input_video}'\n")
-                f.write(f"inpoint {start}\n")
-                f.write(f"outpoint {end}\n")
-        
-        # 记录concat文件内容以便调试
-        with open(concat_file, 'r') as f:
-            logger.debug(f"Concat文件内容:\n{f.read()}")
+                if cut_end <= start or cut_start >= end:
+                    remaining.append((start, end))
+                else:
+                    if start < cut_start:
+                        remaining.append((start, cut_start))
+                    if cut_end < end:
+                        remaining.append((cut_end, end))
+            segments = remaining
+        return segments
     
     def clip_video(
         self,
@@ -128,59 +122,54 @@ class FFmpegService:
             logger.error("没有可保留的片段")
             raise ValueError("没有可保留的片段")
         
-        # 如果只有一个片段且是完整视频，直接复制
-        if len(segments) == 1:
-            start, end = segments[0]
-            duration = edl.get('duration', 0)
-            if start == 0 and abs(end - duration) < 0.1:
-                import shutil
-                shutil.copy2(input_video, output_path)
-                return str(output_path)
-        
-        # 创建 concat 文件
-        concat_file = output_path.parent / f"{uuid.uuid4()}_concat.txt"
-        try:
-            self.create_concat_file(input_video, segments, concat_file)
-            
-            # 设置编码参数
-            codec_args = self._get_codec_args(quality)
-            
-            # 构建 FFmpeg 命令
-            cmd = [
-                self.ffmpeg_path,
-                '-f', 'concat',
-                '-safe', '0',
-                '-i', str(concat_file),
-                *codec_args,
-                '-y',  # 覆盖输出文件
-                str(output_path)
-            ]
-            
-            # 记录FFmpeg命令
-            logger.info(f"执行FFmpeg命令: {' '.join(cmd)}")
-            
-            # 执行 FFmpeg
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 分钟超时
+        previous_end = 0
+        for start, end in segments:
+            if not (isinstance(start, (int, float)) and isinstance(end, (int, float))
+                    and math.isfinite(start) and math.isfinite(end)
+                    and previous_end <= start < end):
+                raise ValueError("无效的保留时间区间")
+            previous_end = end
+
+        ffprobe_path = str(Path(self.ffmpeg_path).with_name('ffprobe'))
+        probe = subprocess.run(
+            [ffprobe_path, '-v', 'error', '-show_streams', '-of', 'json', input_video],
+            capture_output=True, text=True, timeout=30
+        )
+        if probe.returncode != 0:
+            raise RuntimeError(f"FFprobe 失败: {probe.stderr}")
+        streams = json.loads(probe.stdout)['streams']
+        if not any(s['codec_type'] == 'video' for s in streams):
+            raise ValueError("输入文件没有视频轨道")
+        has_audio = any(s['codec_type'] == 'audio' for s in streams)
+
+        filters = []
+        inputs = []
+        for i, (start, end) in enumerate(segments):
+            filters.append(
+                f"[0:v:0]trim=start={start}:end={end},setpts=PTS-STARTPTS[v{i}]"
             )
-            
-            if result.returncode != 0:
-                logger.error(f"FFmpeg执行失败 (返回码: {result.returncode})")
-                logger.error(f"FFmpeg stderr: {result.stderr}")
-                logger.error(f"FFmpeg stdout: {result.stdout}")
-                raise RuntimeError(f"FFmpeg 失败: {result.stderr}")
-            
-            logger.info(f"视频剪辑成功: {output_path}")
-            
-            return str(output_path)
-        
-        finally:
-            # 清理 concat 文件
-            if concat_file.exists():
-                concat_file.unlink()
+            inputs.append(f"[v{i}]")
+            if has_audio:
+                filters.append(
+                    f"[0:a:0]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{i}]"
+                )
+                inputs.append(f"[a{i}]")
+        filters.append(
+            f"{''.join(inputs)}concat=n={len(segments)}:v=1:a={int(has_audio)}"
+            + ('[vout][aout]' if has_audio else '[vout]')
+        )
+        cmd = [self.ffmpeg_path, '-i', input_video,
+               '-filter_complex', ';'.join(filters), '-map', '[vout]']
+        if has_audio:
+            cmd += ['-map', '[aout]']
+        cmd += [*self._get_codec_args(quality), '-y', str(output_path)]
+        logger.info(f"执行FFmpeg命令: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            logger.error(f"FFmpeg stderr: {result.stderr}")
+            raise RuntimeError(f"FFmpeg 失败: {result.stderr}")
+        logger.info(f"视频剪辑成功: {output_path}")
+        return str(output_path)
     
     def _get_codec_args(self, quality: str) -> List[str]:
         """

@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
 COPY app/ ./app/
-COPY run.py .
+COPY run.py asr_demo.py ./
 COPY .env.example .env
 
 # 创建存储目录

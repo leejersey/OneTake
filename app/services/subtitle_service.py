@@ -60,6 +60,26 @@ class SubtitleService:
         return lines
     
     @staticmethod
+    def remap_words(words: List[Dict], segments: List[tuple]) -> List[Dict]:
+        """将原视频词时间映射到保留片段拼接后的时间轴，不修改 EDL。"""
+        mapped = []
+        for word in words:
+            if word.get('auto_delete') or word.get('user_delete'):
+                continue
+            offset = 0
+            spans = []
+            for start, end in segments:
+                overlap_start = max(word['start'], start)
+                overlap_end = min(word['end'], end)
+                if overlap_start < overlap_end:
+                    spans.append((offset + overlap_start - start,
+                                  offset + overlap_end - start))
+                offset += end - start
+            if spans:
+                mapped.append({**word, 'start': spans[0][0], 'end': spans[-1][1]})
+        return mapped
+
+    @staticmethod
     def generate_srt(
         words: List[Dict],
         output_path: str,
@@ -96,7 +116,7 @@ class SubtitleService:
             word_start = word.get('start', 0)
             word_end = word.get('end', 0)
             
-            if not current_start:
+            if current_start is None:
                 current_start = word_start
             
             current_group.append(word_text)

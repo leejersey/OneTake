@@ -6,7 +6,7 @@
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -14,10 +14,21 @@ npm run dev
 
 ## 配置
 
-创建 `.env` 文件：
+默认同源访问 API 和 WebSocket，无需创建 `.env`。开发时 Vite 将 `/api`、`/health` 和 `/ws` 代理到 `127.0.0.1:8000`；Docker 部署由 Nginx 代理到后端服务。
+
+如果后端部署在独立地址，可在 `.env` 中显式设置（修改后需重新构建）：
 
 ```
-VITE_API_BASE=http://localhost:8000
+VITE_API_BASE=https://api.example.com
+```
+
+HTTP API、媒体下载和 WebSocket 都使用这个基址。HTTPS 页面应连接 HTTPS 后端。
+
+## 验证
+
+```bash
+npm test
+npm run build
 ```
 
 ## 功能

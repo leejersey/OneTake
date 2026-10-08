@@ -65,9 +65,7 @@ function Home() {
       setProgressPercent(30);
 
       // 使用 WebSocket 监听进度
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsHost = window.location.hostname + ':8000';
-      const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/tasks/${taskId}`);
+      const ws = new WebSocket(api.getTaskWebSocketUrl(taskId));
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);

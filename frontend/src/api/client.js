@@ -1,7 +1,7 @@
 // API 客户端
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
 
 const apiClient = axios.create({
   baseURL: API_BASE,
@@ -27,6 +27,12 @@ export const api = {
     });
   },
   
+  getTaskWebSocketUrl: (taskId) => {
+    const url = new URL(`${API_BASE}/ws/tasks/${encodeURIComponent(taskId)}`, window.location.origin);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    return url.href;
+  },
+
   // 获取任务状态
   getTask: (taskId) => apiClient.get(`/api/v1/tasks/${taskId}`),
   

@@ -136,7 +136,7 @@ function Editor() {
   const toggleWordDelete = (index) => {
     const newWords = modifiedWords.map((word, i) => 
       i === index 
-        ? { ...word, user_delete: !word.user_delete }
+        ? { ...word, auto_delete: false, user_delete: !(word.auto_delete || word.user_delete) }
         : word
     );
     setModifiedWords(newWords);
@@ -147,7 +147,7 @@ function Editor() {
   const toggleAllFillers = (shouldDelete) => {
     const newWords = modifiedWords.map(word => 
       word.type === 'filler' 
-        ? { ...word, user_delete: shouldDelete }
+        ? { ...word, auto_delete: false, user_delete: shouldDelete }
         : word
     );
     setModifiedWords(newWords);

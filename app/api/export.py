@@ -77,7 +77,9 @@ async def process_export_task(export_id: str, task_id: str, request: ExportReque
             max_chars = subtitle_params['max_chars_per_line']
             
             SubtitleService.generate_srt(
-                words=edl.get('words', []),
+                words=SubtitleService.remap_words(
+                    edl.get('words', []), ffmpeg_service.extract_keep_segments(edl)
+                ),
                 output_path=str(srt_path),
                 max_chars_per_line=max_chars
             )
